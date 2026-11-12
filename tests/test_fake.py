@@ -39,3 +39,7 @@ def test_interview_runs_out():
 def test_extract_korean_full_date():
     items = extract_timeline("t", "2025년 4월 18일 19시 회의 시작\n임원 불참 사유 말함", date(2025, 4, 18))
     assert items[0]["done_on"] == "2025-04-18"
+
+
+def test_keywords_strip_verb_endings():
+    assert keywords("정기총회 어떻게 준비했어?") == ["정기총회", "준비"]

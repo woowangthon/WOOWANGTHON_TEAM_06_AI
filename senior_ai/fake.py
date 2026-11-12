@@ -46,6 +46,8 @@ def extract_timeline(title: str, body: str, occurred_on: date, event_name: str =
             items.append({"title": rest, "done_on": d.isoformat(), "category": _category(rest + event_name), "note": ""})
         elif items:  # undated sentence belongs to the previous dated one
             items[-1]["note"] = (items[-1]["note"] + " " + s).strip()
+    if len(items) > 8:  # long dialogue minutes: dates are noise, keep one item for the document
+        items = []
     if not items:
         items.append({"title": title, "done_on": occurred_on.isoformat(), "category": _category(title + event_name), "note": ""})
     return items
