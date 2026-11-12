@@ -17,4 +17,4 @@ def keywords(question: str) -> list[str]:
 
 
 def sentences(body: str) -> list[str]:
-    return [s.strip() for s in re.split(r"(?<=[.!?다요])\s+", body.strip()) if s.strip()]
+    return [s.strip() for s in re.split(r"\n+|(?<=[.!?다요])\s+", body.strip()) if s.strip()]

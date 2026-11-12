@@ -4,7 +4,7 @@ from datetime import date
 
 from .text import keywords, sentences
 
-_DATE = re.compile(r"(\d{4})[-.](\d{1,2})[-.](\d{1,2})|(\d{1,2})월\s*(\d{1,2})일")
+_DATE = re.compile(r"(\d{4})[-.](\d{1,2})[-.](\d{1,2})|(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일|(\d{1,2})월\s*(\d{1,2})일")
 _CATEGORIES = [
     ("모집", "모집"), ("선거", "선거"), ("면접", "모집"), ("축제", "축제"), ("MT", "행사"),
     ("체육대회", "행사"), ("송년회", "행사"), ("총회", "총회"), ("정산", "회계"), ("예산", "회계"),
@@ -26,7 +26,12 @@ def _find_date(s: str, default_year: int):
     if not m:
         return None, s
     try:
-        d = date(int(m[1]), int(m[2]), int(m[3])) if m[1] else date(default_year, int(m[4]), int(m[5]))
+        if m[1]:
+            d = date(int(m[1]), int(m[2]), int(m[3]))
+        elif m[4]:
+            d = date(int(m[4]), int(m[5]), int(m[6]))
+        else:
+            d = date(default_year, int(m[7]), int(m[8]))
     except ValueError:
         return None, s
     return d, (s[: m.start()] + s[m.end():]).strip()
@@ -52,7 +57,7 @@ def answer_question(question: str, records: list[dict]) -> dict:
     for r in records:
         sents = sentences(r["body"]) or [r["body"]]
         quote = max(sents, key=lambda s: sum(k in s for k in kws))
-        sources.append({"record_id": r["id"], "title": r["title"], "quote": quote, "occurred_on": r.get("occurred_on", "")})
+        sources.append({"record_id": r["id"], "title": r["title"], "quote": quote[:200], "occurred_on": r.get("occurred_on", "")})
     if not sources:
         return {"answer": "기록에 없다.", "sources": []}
     lines = [f"{i}) {s['occurred_on']} '{s['title']}' — {s['quote']}" for i, s in enumerate(sources, 1)]

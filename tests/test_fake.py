@@ -34,3 +34,8 @@ def test_interview_runs_out():
     while (q := next_interview_question("송년회", asked)):
         asked.append(q)
     assert len(asked) == 3
+
+
+def test_extract_korean_full_date():
+    items = extract_timeline("t", "2025년 4월 18일 19시 회의 시작\n임원 불참 사유 말함", date(2025, 4, 18))
+    assert items[0]["done_on"] == "2025-04-18"
