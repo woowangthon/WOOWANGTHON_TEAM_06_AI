@@ -43,3 +43,7 @@ def test_extract_korean_full_date():
 
 def test_keywords_strip_verb_endings():
     assert keywords("정기총회 어떻게 준비했어?") == ["정기총회", "준비"]
+
+
+def test_keywords_strip_attached_time_particle():
+    assert keywords("MT때 출발시간이 왜 밀렸나요?")[0] == "MT"
