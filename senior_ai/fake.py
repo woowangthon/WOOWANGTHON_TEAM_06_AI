@@ -72,3 +72,31 @@ def next_interview_question(event_name: str, asked: list[str]) -> str | None:
         if q not in asked:
             return q
     return None
+
+
+def make_briefing(today, groups: list[dict]) -> dict:
+    """Rule-based briefing: names the events found and quotes the first lesson of each."""
+    if not groups:
+        return {"summary": "이 시기에는 참고할 지난 기록이 없습니다.", "todos": [], "cautions": []}
+    names = ", ".join(g["event"] for g in groups[:4])
+    todos, cautions = [], []
+    for g in groups[:4]:
+        doc = g["docs"][0]
+        todos.append({"title": f"{g['event']} 준비 상황을 점검합니다", "why": f"작년에는 '{doc['title']}'로 {doc['date']}에 다뤘습니다.", "record_ids": [doc["record_id"]]})
+        if g["lessons"]:
+            les = g["lessons"][0]
+            cautions.append({"text": sentences(les["text"])[0][:140], "record_id": les["record_id"]})
+    return {"summary": f"작년 이맘때에는 {names} 관련 기록이 있습니다. 아래 항목은 작년 기록을 그대로 옮긴 것입니다.", "todos": todos, "cautions": cautions[:3]}
+
+
+def interview_next(event_name: str, turns: list[dict], passages: list[dict], max_q: int = 3) -> dict:
+    q = next_interview_question(event_name, [t["question"] for t in turns])
+    return {"question": q, "basis": "", "total": max_q}
+
+
+def suggest_decision(event: str, item_title: str, note: str, lessons: list[dict], past: list[dict], passages: list[dict]) -> dict:
+    if lessons:
+        les = lessons[0]
+        first = sentences(les["text"])[0][:160]
+        return {"body": f"작년 교훈을 반영해 {event}를 진행합니다.", "reason": f"작년 기록에 '{first}'라고 남아 있습니다.", "record_ids": [les["record_id"]]}
+    return {"body": f"작년 방식을 참고해 {event}를 진행합니다.", "reason": f"작년에는 '{item_title}'로 진행했습니다.", "record_ids": []}
