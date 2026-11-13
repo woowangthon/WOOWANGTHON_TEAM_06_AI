@@ -15,6 +15,21 @@ def _ws(s: str) -> str:
     return re.sub(r"\s+", "", s)
 
 
+def _whole_table(quote: str, body: str) -> str:
+    """If the quoted text is inside a markdown table, quote the whole table so the reader sees the full timetable."""
+    lines = body.splitlines()
+    for i, l in enumerate(lines):
+        if l.startswith("|") and _ws(quote)[:20] in _ws(l):
+            a = i
+            while a > 0 and lines[a - 1].startswith("|"):
+                a -= 1
+            b = i
+            while b + 1 < len(lines) and lines[b + 1].startswith("|"):
+                b += 1
+            return "\n".join(lines[a:b + 1])
+    return quote
+
+
 def extract_timeline(title: str, body: str, occurred_on: date, event_name: str = "") -> list[dict]:
     # with the local Claude plan, timeline extraction stays rule based unless LLM_EXTRACT=1 (saves usage on bulk uploads)
     if provider() == "fake" or (provider() == "claude" and os.environ.get("LLM_EXTRACT") != "1"):
@@ -47,6 +62,7 @@ def answer_question(question: str, records: list[dict]) -> dict:
         quote = str(s.get("quote", "")).strip()
         if not quote or _ws(quote) not in _ws(r["body"]):  # model must quote verbatim; otherwise fall back to the passage start
             quote = r["body"].strip()[:150]
+        quote = _whole_table(quote, r["body"])
         if (r["id"], quote) in seen:
             continue
         seen.add((r["id"], quote))
