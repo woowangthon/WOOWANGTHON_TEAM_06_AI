@@ -29,7 +29,7 @@ def test_invented_quote_falls_back_to_passage_text(monkeypatch):
 
 def test_unknown_passage_or_no_sources_means_not_in_records(monkeypatch):
     monkeypatch.setattr(senior_ai, "complete_json", lambda s, p: {"answer": "있다", "sources": [{"passage": "P9", "quote": "q"}]})
-    assert answer_question("?", REC) == {"answer": "기록에 없다.", "sources": []}
+    assert answer_question("?", REC) == {"answer": "기록에 없습니다.", "sources": []}
 
 
 def test_missing_key_is_llm_error(monkeypatch):

@@ -16,7 +16,7 @@ def test_extract_falls_back_to_record_date():
 
 
 def test_answer_without_records_says_not_in_records():
-    assert answer_question("학식 메뉴는?", []) == {"answer": "기록에 없다.", "sources": []}
+    assert answer_question("학식 메뉴는?", []) == {"answer": "기록에 없습니다.", "sources": []}
 
 
 def test_answer_cites_quote():

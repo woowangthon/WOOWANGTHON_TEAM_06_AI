@@ -50,7 +50,7 @@ def answer_question(question: str, records: list[dict]) -> dict:
         seen.add((r["id"], quote))
         sources.append({"record_id": r["id"], "title": r["title"], "quote": quote, "occurred_on": r.get("occurred_on", "")})
     if not answer or not sources:
-        return {"answer": "기록에 없다.", "sources": []}
+        return {"answer": "기록에 없습니다.", "sources": []}
     return {"answer": answer, "sources": sources}
 
 

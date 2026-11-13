@@ -61,9 +61,9 @@ def answer_question(question: str, records: list[dict]) -> dict:
         quote = max(sents, key=lambda s: sum(k in s for k in kws))
         sources.append({"record_id": r["id"], "title": r["title"], "quote": quote[:200], "occurred_on": r.get("occurred_on", "")})
     if not sources:
-        return {"answer": "기록에 없다.", "sources": []}
+        return {"answer": "기록에 없습니다.", "sources": []}
     lines = [f"{i}) {s['occurred_on']} '{s['title']}' — {s['quote']}" for i, s in enumerate(sources, 1)]
-    return {"answer": "기록에는 이렇게 남아 있다.\n" + "\n".join(lines), "sources": sources}
+    return {"answer": "기록에는 이렇게 남아 있습니다.\n" + "\n".join(lines), "sources": sources}
 
 
 def next_interview_question(event_name: str, asked: list[str]) -> str | None:
