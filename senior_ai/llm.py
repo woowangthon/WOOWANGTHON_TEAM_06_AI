@@ -1,6 +1,9 @@
 """Single entry point for LLM access. Provider is chosen by LLM_PROVIDER (default: fake)."""
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -13,8 +16,27 @@ def provider() -> str:
     return os.environ.get("LLM_PROVIDER", "fake").lower()
 
 
+def _claude_cli(system: str, prompt: str) -> str:
+    """Use the locally logged-in Claude Code (your own Claude plan) as the model: `claude -p`.
+    Runs in an empty temp dir with tools, hooks and project settings off so only the prompt matters."""
+    exe = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
+    cmd = [exe, "-p", "--system-prompt", system, "--tools", "", "--no-session-persistence", "--setting-sources", "",
+           "--model", os.environ.get("CLAUDE_MODEL", "sonnet"), "--output-format", "text"]
+    try:
+        with tempfile.TemporaryDirectory() as cwd:
+            r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=180, cwd=cwd)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise LLMError(f"Claude Code 호출에 실패했습니다: {type(e).__name__}") from e
+    if r.returncode != 0 or not r.stdout.strip():
+        first = (r.stderr or r.stdout).strip().splitlines()[:1]
+        raise LLMError("Claude Code 호출에 실패했습니다: " + (first[0][:120] if first else "빈 응답"))
+    return r.stdout.strip()
+
+
 def complete(system: str, prompt: str, json_mode: bool = True) -> str:
-    """Gemini generateContent over REST. Key and model come from the environment only."""
+    """Gemini generateContent over REST, or the local Claude Code CLI. Keys and models come from the environment only."""
+    if provider() == "claude":
+        return _claude_cli(system, prompt)
     key = os.environ.get("GEMINI_API_KEY", "")
     if not key:
         raise LLMError("GEMINI_API_KEY is not set")

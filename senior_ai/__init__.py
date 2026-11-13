@@ -1,4 +1,5 @@
 """AI logic for 졸업하지 않는 선배. The backend imports these functions."""
+import os
 import re
 from datetime import date
 
@@ -15,7 +16,8 @@ def _ws(s: str) -> str:
 
 
 def extract_timeline(title: str, body: str, occurred_on: date, event_name: str = "") -> list[dict]:
-    if provider() == "fake":
+    # with the local Claude plan, timeline extraction stays rule based unless LLM_EXTRACT=1 (saves usage on bulk uploads)
+    if provider() == "fake" or (provider() == "claude" and os.environ.get("LLM_EXTRACT") != "1"):
         return fake.extract_timeline(title, body, occurred_on, event_name)
     data = complete_json(EXTRACT_SYSTEM, f"문서 제목: {title}\n행사명: {event_name}\n문서 날짜: {occurred_on}\n\n본문:\n{body[:12000]}")
     items = []
