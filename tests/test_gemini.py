@@ -80,3 +80,16 @@ def test_thinking_off_is_dropped_when_the_model_rejects_it(monkeypatch):
     monkeypatch.setattr(llm, "_gemini_request", fake_request)
     assert llm.complete("s", "p", json_mode=False) == "ok" and seen == [True, False]
     llm._model_cache.clear()
+
+
+def test_rate_limit_error_is_explained(monkeypatch):
+    import urllib.error
+
+    from senior_ai import llm
+    llm._model_cache.clear()
+    monkeypatch.setenv("GEMINI_API_KEY", "k3")
+    monkeypatch.setattr(llm, "_gemini_request", lambda url, key, body=None: (_ for _ in ()).throw(urllib.error.HTTPError(url, 429, "x", {}, None)))
+    with pytest.raises(LLMError) as e:
+        llm.complete("s", "p")
+    assert "429" in str(e.value) and "한도" in str(e.value)
+    llm._model_cache.clear()

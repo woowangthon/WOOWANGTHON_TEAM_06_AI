@@ -95,8 +95,12 @@ def complete(system: str, prompt: str, json_mode: bool = True) -> str:
                 raise
         return data["candidates"][0]["content"]["parts"][0]["text"]
     except urllib.error.HTTPError as e:
-        raise LLMError(f"Gemini HTTP {e.code} (model {model})") from e
-    except (urllib.error.URLError, KeyError, IndexError, ValueError, TimeoutError) as e:
+        hint = {429: "무료 사용량 한도에 도달했습니다. 1분쯤 뒤에 다시 시도해 주세요", 403: "API 키 권한을 확인해 주세요",
+                503: "AI 서버가 바쁩니다. 잠시 뒤에 다시 시도해 주세요"}.get(e.code, "")
+        raise LLMError(f"Gemini HTTP {e.code} (model {model}){': ' + hint if hint else ''}") from e
+    except TimeoutError as e:
+        raise LLMError(f"AI 응답이 늦어 중단했습니다 (model {model}). 잠시 뒤에 다시 시도해 주세요") from e
+    except (urllib.error.URLError, KeyError, IndexError, ValueError) as e:
         raise LLMError(f"Gemini call failed: {type(e).__name__} (model {model})") from e
 
 
