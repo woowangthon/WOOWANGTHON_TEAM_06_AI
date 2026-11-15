@@ -44,8 +44,8 @@ def extract_timeline(title: str, body: str, occurred_on: date, event_name: str =
         if d:
             rest = re.sub(r"^[\s,.:·-]+|[\s.]+$", "", rest) or title
             items.append({"title": rest, "done_on": d.isoformat(), "category": _category(rest + event_name), "note": ""})
-        elif items:  # undated sentence belongs to the previous dated one
-            items[-1]["note"] = (items[-1]["note"] + " " + s).strip()
+        elif items and not s.startswith("|"):  # undated sentence belongs to the previous dated one; table rows stay out of the note
+            items[-1]["note"] = (items[-1]["note"] + " " + s).strip()[:160]
     if len(items) > 8:  # long dialogue minutes: dates are noise, keep one item for the document
         items = []
     if not items:

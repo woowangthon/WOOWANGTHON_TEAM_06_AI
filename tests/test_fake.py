@@ -47,3 +47,9 @@ def test_keywords_strip_verb_endings():
 
 def test_keywords_strip_attached_time_particle():
     assert keywords("MT때 출발시간이 왜 밀렸나요?")[0] == "MT"
+
+
+def test_table_rows_do_not_leak_into_item_notes():
+    body = "2025-11-04 체육대회를 진행했다. 간식이 부족했다.\n행사 일정\n| 시간 | 일정 |\n| --- | --- |\n| 09:00 | 집합 |"
+    items = extract_timeline("t", body, date(2025, 11, 4))
+    assert "|" not in items[0]["note"] and "간식" in items[0]["note"]

@@ -1,6 +1,7 @@
 """Single entry point for LLM access. Provider is chosen by LLM_PROVIDER (default: fake)."""
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -33,6 +34,34 @@ def _claude_cli(system: str, prompt: str) -> str:
     return r.stdout.strip()
 
 
+_model_cache: dict[str, str] = {}
+_SKIP = ("image", "tts", "live", "audio", "embedding", "robotics", "computer", "vision", "exp", "thinking", "preview", "customtools")
+
+
+def _gemini_request(url: str, key: str, body: dict | None = None):
+    req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Content-Type": "application/json", "x-goog-api-key": key})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.load(r)
+
+
+def _pick_gemini_model(key: str) -> str:
+    """Ask the API which models this key can use and take a recent flash model (names change over time)."""
+    data = _gemini_request("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", key)
+    names = [m["name"].removeprefix("models/") for m in data.get("models", [])
+             if "generateContent" in m.get("supportedGenerationMethods", []) and m["name"].startswith("models/gemini")]
+    flash = [n for n in names if "flash" in n and not any(x in n for x in _SKIP)]
+    pool = flash or [n for n in names if not any(x in n for x in _SKIP)] or names
+    if not pool:
+        raise LLMError("사용할 수 있는 Gemini 모델을 찾지 못했습니다")
+
+    def rank(n: str):
+        m = re.search(r"gemini-(\d+(?:\.\d+)?)", n)
+        return ("lite" not in n, float(m[1]) if m else 0.0, n)  # newest non-lite flash first
+
+    return max(pool, key=rank)
+
+
 def complete(system: str, prompt: str, json_mode: bool = True) -> str:
     """Gemini generateContent over REST, or the local Claude Code CLI. Keys and models come from the environment only."""
     if provider() == "claude":
@@ -40,23 +69,25 @@ def complete(system: str, prompt: str, json_mode: bool = True) -> str:
     key = os.environ.get("GEMINI_API_KEY", "")
     if not key:
         raise LLMError("GEMINI_API_KEY is not set")
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.2, **({"responseMimeType": "application/json"} if json_mode else {})},
     }
-    req = urllib.request.Request(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "x-goog-api-key": key},
-    )
+    model = _model_cache.get(key) or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = json.load(r)
+        for attempt in (0, 1):
+            try:
+                data = _gemini_request(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", key, body)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 404 and attempt == 0:  # unknown model name: switch to one the key can really use
+                    model = _model_cache[key] = _pick_gemini_model(key)
+                    continue
+                raise
         return data["candidates"][0]["content"]["parts"][0]["text"]
     except urllib.error.HTTPError as e:
-        raise LLMError(f"Gemini HTTP {e.code}") from e
+        raise LLMError(f"Gemini HTTP {e.code} (model {model})") from e
     except (urllib.error.URLError, KeyError, IndexError, ValueError, TimeoutError) as e:
         raise LLMError(f"Gemini call failed: {type(e).__name__}") from e
 
