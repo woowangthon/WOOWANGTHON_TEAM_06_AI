@@ -50,7 +50,7 @@ def test_unknown_model_404_falls_back_to_a_listed_flash_model(monkeypatch):
     def fake_request(url, key, body=None):
         calls.append(url)
         if url.endswith("/models?pageSize=200"):
-            ms = [("gemini-2.5-flash-lite", "generateContent"), ("gemini-3.0-flash", "generateContent"), ("gemini-3.0-flash-preview", "generateContent"),
+            ms = [("gemini-2.5-flash-lite", "generateContent"), ("gemini-3.0-flash-lite", "generateContent"), ("gemini-3.0-flash", "generateContent"), ("gemini-3.0-flash-preview", "generateContent"),
                   ("gemini-2.5-flash-image", "generateContent"), ("gemini-embedding-001", "embedContent")]
             return {"models": [{"name": f"models/{n}", "supportedGenerationMethods": [m]} for n, m in ms]}
         if "gemini-2.5-flash-lite:" in url:
@@ -59,5 +59,24 @@ def test_unknown_model_404_falls_back_to_a_listed_flash_model(monkeypatch):
 
     monkeypatch.setattr(llm, "_gemini_request", fake_request)
     assert llm.complete("s", "p") == '{"ok": true}'
-    assert any("gemini-3.0-flash:" in c for c in calls) and llm._model_cache["k"] == "gemini-3.0-flash"
+    assert any("gemini-3.0-flash-lite:" in c for c in calls) and llm._model_cache["k"] == "gemini-3.0-flash-lite"
+    llm._model_cache.clear()
+
+
+def test_thinking_off_is_dropped_when_the_model_rejects_it(monkeypatch):
+    import urllib.error
+
+    from senior_ai import llm
+    llm._model_cache.clear()
+    monkeypatch.setenv("GEMINI_API_KEY", "k2")
+    seen = []
+
+    def fake_request(url, key, body=None):
+        seen.append("thinkingConfig" in body["generationConfig"])
+        if "thinkingConfig" in body["generationConfig"]:
+            raise urllib.error.HTTPError(url, 400, "bad", {}, None)
+        return {"candidates": [{"content": {"parts": [{"text": "ok"}]}}]}
+
+    monkeypatch.setattr(llm, "_gemini_request", fake_request)
+    assert llm.complete("s", "p", json_mode=False) == "ok" and seen == [True, False]
     llm._model_cache.clear()

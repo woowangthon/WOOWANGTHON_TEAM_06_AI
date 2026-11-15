@@ -41,7 +41,7 @@ _SKIP = ("image", "tts", "live", "audio", "embedding", "robotics", "computer", "
 def _gemini_request(url: str, key: str, body: dict | None = None):
     req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None,
                                  headers={"Content-Type": "application/json", "x-goog-api-key": key})
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=90) as r:
         return json.load(r)
 
 
@@ -57,7 +57,7 @@ def _pick_gemini_model(key: str) -> str:
 
     def rank(n: str):
         m = re.search(r"gemini-(\d+(?:\.\d+)?)", n)
-        return ("lite" not in n, float(m[1]) if m else 0.0, n)  # newest non-lite flash first
+        return ("lite" in n, float(m[1]) if m else 0.0, n)  # fast flash-lite first (newest), then flash
 
     return max(pool, key=rank)
 
@@ -74,22 +74,30 @@ def complete(system: str, prompt: str, json_mode: bool = True) -> str:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.2, **({"responseMimeType": "application/json"} if json_mode else {})},
     }
-    model = _model_cache.get(key) or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    model = _model_cache.get(key) or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    # answers should be fast: turn the model's hidden "thinking" off; models that reject the setting get the plain request
+    variants = [{**body, "generationConfig": {**body["generationConfig"], "thinkingConfig": {"thinkingBudget": 0}}}, body]
     try:
-        for attempt in (0, 1):
+        i = 0
+        switched = False
+        while True:
             try:
-                data = _gemini_request(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", key, body)
+                data = _gemini_request(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", key, variants[i])
                 break
             except urllib.error.HTTPError as e:
-                if e.code == 404 and attempt == 0:  # unknown model name: switch to one the key can really use
+                if e.code == 404 and not switched:  # unknown model name: switch to one the key can really use
                     model = _model_cache[key] = _pick_gemini_model(key)
+                    switched = True
+                    continue
+                if e.code == 400 and i == 0:  # this model does not accept thinkingConfig
+                    i = 1
                     continue
                 raise
         return data["candidates"][0]["content"]["parts"][0]["text"]
     except urllib.error.HTTPError as e:
         raise LLMError(f"Gemini HTTP {e.code} (model {model})") from e
     except (urllib.error.URLError, KeyError, IndexError, ValueError, TimeoutError) as e:
-        raise LLMError(f"Gemini call failed: {type(e).__name__}") from e
+        raise LLMError(f"Gemini call failed: {type(e).__name__} (model {model})") from e
 
 
 def complete_json(system: str, prompt: str):

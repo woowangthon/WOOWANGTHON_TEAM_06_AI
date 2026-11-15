@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "senior-ai"
-version = "0.1.1"
+version = "0.1.2"
 description = "AI logic for 졸업하지 않는 선배: timeline extraction, grounded answers, interview questions"
 requires-python = ">=3.10"
 dependencies = []
