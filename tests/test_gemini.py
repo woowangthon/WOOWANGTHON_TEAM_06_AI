@@ -93,3 +93,15 @@ def test_rate_limit_error_is_explained(monkeypatch):
         llm.complete("s", "p")
     assert "429" in str(e.value) and "한도" in str(e.value)
     llm._model_cache.clear()
+
+
+def test_upload_extraction_does_not_call_the_model_by_default(monkeypatch):
+    from datetime import date
+
+    monkeypatch.delenv("LLM_EXTRACT", raising=False)
+
+    def boom(*a, **k):
+        raise AssertionError("model must not be called")
+
+    monkeypatch.setattr(senior_ai, "complete_json", boom)
+    assert senior_ai.extract_timeline("t", "2025-05-01 모임을 했다.", date(2025, 5, 1))[0]["done_on"] == "2025-05-01"

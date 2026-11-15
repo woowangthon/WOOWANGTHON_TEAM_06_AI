@@ -31,8 +31,8 @@ def _whole_table(quote: str, body: str) -> str:
 
 
 def extract_timeline(title: str, body: str, occurred_on: date, event_name: str = "") -> list[dict]:
-    # with the local Claude plan, timeline extraction stays rule based unless LLM_EXTRACT=1 (saves usage on bulk uploads)
-    if provider() == "fake" or (provider() == "claude" and os.environ.get("LLM_EXTRACT") != "1"):
+    # timeline extraction stays rule based unless LLM_EXTRACT=1, so uploads do not spend model quota (free plans allow few calls a day)
+    if provider() == "fake" or os.environ.get("LLM_EXTRACT") != "1":
         return fake.extract_timeline(title, body, occurred_on, event_name)
     data = complete_json(EXTRACT_SYSTEM, f"문서 제목: {title}\n행사명: {event_name}\n문서 날짜: {occurred_on}\n\n본문:\n{body[:12000]}")
     items = []
